@@ -1,0 +1,14 @@
+.vscode/c_cpp_properties.json
+*.o
+*.a
+*.elf
+*.bin
+*.img
+*.lo
+*.map
+.depend.mk
+.depend
+config.mk
+examples/**/sizes.c
+mygarbage/**/sizes.c
+qemu.pid
