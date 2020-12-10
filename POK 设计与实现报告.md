@@ -11,9 +11,9 @@
 ```c
 	#define POK_CONFIG_NB_PARTITIONS 2  // 指定分区数目
 	// 分区运行在一个slot当中
-	#define POK_CONFIG_SCHEDULING_NBSLOTS 4  													  // slot数目									  
-  #define POK_CONFIG_SCHEDULING_SLOTS { 20000, 40000, 10000, 10000 }  // 每个 slot 分配的时间
-  #define POK_CONFIG_SCHEDULING_SLOTS_ALLOCATION { 0, 1, 0, 1 }				// 每个 slot 运行哪个分区
+	#define POK_CONFIG_SCHEDULING_NBSLOTS 4                             // slot数目
+	#define POK_CONFIG_SCHEDULING_SLOTS { 20000, 40000, 10000, 10000 }  // 每个 slot 分配的时间
+	#define POK_CONFIG_SCHEDULING_SLOTS_ALLOCATION { 0, 1, 0, 1 }       // 每个 slot 运行哪个分区
   
 ```
 
