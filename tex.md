@@ -1,0 +1,1 @@
+为了成功编译doc，我先后在mac上安装了doxygen，inkscape，修改了queueing.h为queuing.h，目前卡在ocarina-config命令找不到。
