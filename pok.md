@@ -34,4 +34,10 @@ POK_CONFIG_PARTITIONS_NTHREADS	是一个数组，数组大小和partition的数�
 
 POK_CONFIG_PARTITIONS_SCHEDULER	一个数组，和partition一一对应。数组的元素是pok_sched_t中的一种。pok_sched_t是一个enum类型（在schedvalues.h里定义的），后面实现不同的调度算法要在这里加一个调度类型，在sched.c中实现具体调度算法函数，并在partition.c中的pok_partition_setup_scheduler函数（该函数会在boot的时候被调用）中将具体调度函数与partiton挂钩，就可以使用了。注意此处的调度函数是用于partition调度thread的函数，partition自身的调度与此无关。调度函数会在pok_sched函数调用pok_elect_thread时，具体选择出partition内部的某一个线程进行执行。
 
-POK_CONFIG_SCHEDULING_SLOTS	时间片额度数组，
+POK_CONFIG_SCHEDULING_SLOTS	时间片额度数组，与POK_CONFIG_SCHEDULING_SLOTS_ALLOCATION一起使用，可以指定每个partition每次运行的时间
+POK_CONFIG_SCHEDULING_MAJOR_FRAME         时间片额度数组各个成员之和
+POK_CONFIG_SCHEDULING_SLOTS_ALLOCATION          时间片额度分配数组，指定了每个时间片应该给哪个partition
+POK_CONFIG_SCHEDULING_NBSLOTS           有多少个slot
+
+POK_CONFIG_PARTITIONS_NTHREADS          一个数组，数量为partition的数目，指定了每个partition的线程
+POK_CONFIG_PARTITIONS_NLOCKOBJECTS      每个partition所需要的临界区数目
