@@ -55,6 +55,7 @@
 typedef struct {
     uint8_t priority;
     uint64_t period;
+    uint64_t deadline_actual;
     uint64_t deadline;
     uint64_t time_capacity;
     uint64_t remaining_time_capacity;
@@ -100,6 +101,7 @@ pok_ret_t pok_thread_get_status(const uint32_t id, pok_thread_attr_t* attr);
 pok_ret_t pok_thread_set_priority(const uint32_t id, const uint32_t priority);
 pok_ret_t pok_thread_resume(const uint32_t id);
 pok_ret_t pok_thread_suspend_target(const uint32_t id);
+void print_thread_info(const uint32_t id);
 
 #ifdef POK_NEEDS_PARTITIONS
 pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr_t* attr, const uint8_t partition_id);

@@ -61,6 +61,11 @@ void pok_partition_setup_scheduler(const uint8_t pid) {
         pok_partitions[pid].sched_func = &pok_sched_part_rms;
         break;
 #endif
+#ifdef POK_NEEDS_SCHED_EDF
+    case POK_SCHED_EDF:
+        pok_partitions[pid].sched_func = &pok_sched_part_edf;
+        break;
+#endif
 
         /*
          * Default scheduling algorithm is Round Robin.
@@ -120,7 +125,7 @@ void pok_partition_setup_main_thread(const uint8_t pid) {
 
     attr.entry = (uint32_t *)pok_partitions[pid].thread_main_entry;
     attr.priority = 1;
-    attr.deadline = 0;
+    attr.deadline = -1;     // set as infinite
     attr.period = 0;
     attr.time_capacity = 0;
 
@@ -247,6 +252,7 @@ pok_ret_t pok_partition_init() {
  * Else, returns POK_ERRNO_OK
  */
 pok_ret_t pok_partition_set_mode(const uint8_t pid, const pok_partition_mode_t mode) {
+    uint64_t now = POK_GETTICK();
     switch (mode) {
     case POK_PARTITION_MODE_NORMAL:
         /*
@@ -268,6 +274,10 @@ pok_ret_t pok_partition_set_mode(const uint8_t pid, const pok_partition_mode_t m
         unsigned int i;
         for (i = 0; i < pok_partitions[pid].nthreads; i++) {
             thread = &(pok_threads[POK_CURRENT_PARTITION.thread_index_low + i]);
+            if (1) {
+                thread->deadline_actual = now + thread->deadline;
+            }
+            //print_thread_info(i);
             if ((long long)thread->period == -1) { //-1 <==> ARINC INFINITE_TIME_VALUE
                 if (thread->state == POK_STATE_DELAYED_START) { // delayed start, the delay is in the wakeup time
                     if (!thread->wakeup_time) {

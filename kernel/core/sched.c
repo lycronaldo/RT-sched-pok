@@ -106,12 +106,12 @@ void pok_sched_init(void) {
     }
 #endif
 #endif
-
-    pok_sched_current_slot = 0;
-    pok_sched_next_major_frame = POK_CONFIG_SCHEDULING_MAJOR_FRAME;
-    pok_sched_next_deadline = pok_sched_slots[0];
+    /* This is for partition only */
+    pok_sched_current_slot = 0;                                             // 0
+    pok_sched_next_major_frame = POK_CONFIG_SCHEDULING_MAJOR_FRAME;         // 5000
+    pok_sched_next_deadline = pok_sched_slots[0];                           // 5000
     pok_sched_next_flush = 0;
-    pok_current_partition = pok_sched_slots_allocation[0];
+    pok_current_partition = pok_sched_slots_allocation[0];                  // 0
 }
 
 uint8_t pok_sched_get_priority_min(const pok_sched_t sched_type) {
@@ -201,6 +201,7 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
 #if defined(POK_NEEDS_LOCKOBJECTS) || defined(POK_NEEDS_PORTS_QUEUEING) || defined(POK_NEEDS_PORTS_SAMPLING)
         if ((thread->state == POK_STATE_WAITING) && (thread->wakeup_time <= now)) {
             thread->state = POK_STATE_RUNNABLE;
+            thread->deadline_actual = now + thread->deadline;
         }
 #endif
 
@@ -209,6 +210,7 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
             thread->remaining_time_capacity = thread->time_capacity;
             // printf("%s, Thread %d of partition %d refill time slice\n", __func__, i, new_partition_id);
             thread->next_activation = thread->next_activation + thread->period;
+            thread->deadline_actual = now + thread->deadline;
         }
     }
 
@@ -245,11 +247,13 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
 #endif
         ) {
             POK_CURRENT_THREAD.remaining_time_capacity = POK_CURRENT_THREAD.remaining_time_capacity - 1;
-            if (POK_CURRENT_THREAD.remaining_time_capacity == 0
+            if (POK_CURRENT_THREAD.remaining_time_capacity <= 0
                 && POK_CURRENT_THREAD.time_capacity > 0) // Wait next activation only for thread
                                                          // with non-infinite capacity (could be
                                                          // infinite with value -1 <--> INFINITE_TIME_CAPACITY)
             {
+                if (POK_CURRENT_THREAD.deadline_actual >= now)
+                    printf("thread %d finished sucessfully\n", POK_SCHED_CURRENT_THREAD);
                 POK_CURRENT_THREAD.state = POK_STATE_WAIT_NEXT_ACTIVATION;
             }
         }
@@ -280,13 +284,28 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
 
     // computed next thread's deadline
     pok_threads[elected].end_time = now + pok_threads[elected].remaining_time_capacity;
-
+    // for (i = 0; i < new_partition->nthreads; i++) {
+    //     thread = &(pok_threads[new_partition->thread_index_low + i]);
+    //     // if (i == 0) {
+    //     //     thread->end_time = -1;
+    //     //     continue;
+    //     // }
+    //     thread->end_time = now + thread->remaining_time_capacity;
+    // } 
     return (elected);
 }
 #endif /* POK_NEEDS_PARTITIONS */
 
 #ifdef POK_NEEDS_PARTITIONS
 void pok_sched() {
+    if (POK_GETTICK() >= 60) {
+        printf("reach time limits\n");
+        while (1)
+        {
+            ;
+        }
+        
+    }
     uint32_t elected_thread = 0;
     uint8_t elected_partition = POK_SCHED_CURRENT_PARTITION;
 
@@ -423,6 +442,8 @@ uint32_t pok_sched_part_rms(const uint32_t index_low, const uint32_t index_high,
 
 uint32_t pok_sched_part_rr(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
                            const uint32_t current_thread) {
+    printf("rr sched\n");
+
     uint32_t res;
     uint32_t from;
 
@@ -523,3 +544,57 @@ uint32_t pok_sched_get_current(uint32_t* thread_id) {
 #endif
 
 #endif /* __POK_NEEDS_SCHED */
+
+
+
+/* newly implemented sched functions */
+uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
+                           const uint32_t current_thread) {
+    uint64_t now = POK_GETTICK(); 
+    printf("edf sched start, current tick %d\n", now);
+    // print_thread_info(current_thread);
+    uint32_t res, index;
+    uint64_t earliest_ddl;
+    pok_thread_t *ct;
+
+    if (current_thread == IDLE_THREAD) {
+        res = prev_thread;
+    } else {
+        res = current_thread;
+    }
+
+    for (index = index_low; index <= index_high; ++index) {
+        ct = &pok_threads[index];
+            if ((ct->deadline_actual > 0 && ct->state == POK_STATE_RUNNABLE)) {
+                if (ct->remaining_time_capacity == 0 && ct->deadline_actual >= now) {
+                    ct->state = POK_STATE_WAIT_NEXT_ACTIVATION;
+                    printf("thread %d finished sucessfully\n", index);
+                }
+                if (ct->deadline_actual >= now) {
+                    continue;
+                }
+                else {
+                    ct->state = POK_STATE_STOPPED;
+                    printf("thread %d miss its deadline, kill this thread\n", index);
+                }
+            }
+    }
+
+    earliest_ddl = -1;
+    for (index = index_low; index <= index_high; ++index) {
+        ct = &pok_threads[index];
+        if (ct->state != POK_STATE_RUNNABLE)
+            continue;
+        if (ct->deadline_actual < earliest_ddl) {
+            earliest_ddl = ct->deadline_actual;
+            res = index;
+        }
+    }
+    if (earliest_ddl == (uint64_t)-1)
+        res = IDLE_THREAD;
+    // print_thread_info(res);
+    printf("edf sched end, select %d\n", res);
+    return res;
+}
+
+

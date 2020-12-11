@@ -30,7 +30,7 @@
 
 ### 线程调度过程
 
-* pok_sched (每20ms触发1次)
+* pok_sched
   * pok_elect_partition
   * pok_elect_thread
     * 获取当前时间
@@ -42,26 +42,4 @@
     * 设置要调度的线程的end_time = now + remaining_time_capacity
   * 如果选择的thread和当前的不一样, 则切换线程
   * pok_sched_context_switch
-
-### 对线程状态的理解
-* 初始化时，若不设置delayed_start，则所有的wakeup_time都为0，也就是在main_thread调用sched时直接就是runnable的状态
-* wakeup_time和POK_STATE_WAITING挂钩, pok_elect_thread会检查当前时间, 一旦wakeup_time到了就设置其为runnable, wakeup_time就没用了
-
-* period就是指周期, 与之相关联的是next_activation
-* POK_STATE_WAITING是只有period = -1且wakeup_time != 0的线程一开始的状态
-* 之后所有线程都是在runnable和wait_next_activation之间切换
-* 线程的next_activation被初始化为period
-* pok_sched函数检查到当前线程time_capacity耗尽之后, 就把state切换到wait_next_activation, 然后调用sched_func
-* pok_elect_thread函数会检查处于wait_next_activation的线程的next_activation, 到了就改为runnable, 并更新下一次next_activation += period
-
-### TODO
-* 在next_activation被触发的时候需要更新dealine_actual
-
-### EDF Design
-
-* 设置线程的period和deadline, 初始的deadline_actual设为-1
-* 在pok_partition_set_mode中设置runnable的线程的deadline_actual
-* 之后在pok_sched中检查deadline_actual是否miss, miss就kill
-* 当wait->runnable, wait_activation->runnable时, 更新其deadline_actual
-* 
 
