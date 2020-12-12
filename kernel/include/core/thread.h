@@ -57,6 +57,7 @@ typedef struct {
     uint64_t period;
     uint64_t deadline_actual;
     uint64_t deadline;
+    uint64_t arrive_time;
     uint64_t time_capacity;
     uint64_t remaining_time_capacity;
     uint64_t next_activation;
@@ -80,6 +81,7 @@ typedef struct {
     void* entry; /* entrypoint of the thread  */
     uint64_t period;
     uint64_t deadline;
+    uint64_t arrive_time;
     uint64_t time_capacity;
     uint32_t stack_size;
     pok_state_t state;

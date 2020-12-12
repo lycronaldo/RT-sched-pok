@@ -119,3 +119,29 @@ uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high,
 }
 ```
 
+## 2. 动态线程调度
+
+**环境设置**
+
+* 设置`POK_CONFIG_NB_PARTITIONS`为1，我们只需要一个分区即可。
+* 修改内核时钟中断为每1ms触发一次，`POK_TIMER_QUANTUM`修改为1，即每个tick (1ms)都会出发一次调度。
+
+**实现**
+
+* 在`pok_thread_t`, `pok_thread_attr_t`这两个结构体中添加了`arrive_time`属性, 表示线程到达的绝对时间
+* 在线程初始化时, 也就是在`pok_partition_thread_create`中初始化此字段
+* 在每次时钟中断触发调度时, 都检查一次所有线程的arrive_time是否小于等于当前时间, 如果小于,则将其状态改为`POK_STATE_RUNNABLE`, 否则, 将其状态改为`POK_STATE_STOPPED`
+
+```c
+for (i = 0; i < new_partition->nthreads; i++) {
+        thread = &(pok_threads[new_partition->thread_index_low + i]);
+        if (thread->arrive_time > now) {
+            thread->state = POK_STATE_STOPPED;
+            continue;
+        }
+        else {
+            thread->state = POK_STATE_RUNNABLE;
+        }
+}
+```
+

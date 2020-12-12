@@ -166,6 +166,10 @@ pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr
     }
     pok_threads[id].deadline_actual = -1;
 
+    /* set arrive_time */
+    if (attr->arrive_time > 0)
+        pok_threads[id].arrive_time = attr->arrive_time;
+
 #ifdef POK_NEEDS_SCHED_HFPPS
     pok_threads[id].payback = 0;
 #endif /* POK_NEEDS_SCHED_HFPPS */
@@ -357,6 +361,7 @@ void print_thread_info(uint32_t id)
         printf("period = %d\n", thread->period);
         printf("deadline = %d\n", thread->deadline);
         printf("deadline_actual = %d\n", thread->deadline_actual);
+        printf("arrive_time = %d\n", thread->arrive_time);
         printf("time_capacity = %d\n", thread->time_capacity);
         printf("remaining_time_capacity = %d\n", thread->remaining_time_capacity);
         printf("next_activation = %d\n", thread->next_activation);

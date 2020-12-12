@@ -197,6 +197,15 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
     pok_thread_t* thread;
     for (i = 0; i < new_partition->nthreads; i++) {
         thread = &(pok_threads[new_partition->thread_index_low + i]);
+        if (thread->arrive_time > now) {
+            thread->state = POK_STATE_STOPPED;
+            continue;
+        }
+        else
+        {
+            thread->state = POK_STATE_RUNNABLE;
+        }
+        
 
 #if defined(POK_NEEDS_LOCKOBJECTS) || defined(POK_NEEDS_PORTS_QUEUEING) || defined(POK_NEEDS_PORTS_SAMPLING)
         if ((thread->state == POK_STATE_WAITING) && (thread->wakeup_time <= now)) {
@@ -298,7 +307,7 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
 
 #ifdef POK_NEEDS_PARTITIONS
 void pok_sched() {
-    if (POK_GETTICK() >= 60) {
+    if (POK_GETTICK() >= 20) {
         printf("reach time limits\n");
         while (1)
         {
@@ -565,19 +574,19 @@ uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high,
 
     for (index = index_low; index <= index_high; ++index) {
         ct = &pok_threads[index];
-            if ((ct->deadline_actual > 0 && ct->state == POK_STATE_RUNNABLE)) {
-                if (ct->remaining_time_capacity == 0 && ct->deadline_actual >= now) {
-                    ct->state = POK_STATE_WAIT_NEXT_ACTIVATION;
-                    printf("thread %d finished sucessfully\n", index);
-                }
-                if (ct->deadline_actual >= now) {
-                    continue;
-                }
-                else {
-                    ct->state = POK_STATE_STOPPED;
-                    printf("thread %d miss its deadline, kill this thread\n", index);
-                }
+        if ((ct->deadline_actual > 0 && ct->state == POK_STATE_RUNNABLE)) {
+            if (ct->remaining_time_capacity == 0 && ct->deadline_actual >= now) {
+                ct->state = POK_STATE_WAIT_NEXT_ACTIVATION;
+                printf("thread %d finished sucessfully\n", index);
             }
+            if (ct->deadline_actual >= now) {
+                continue;
+            }
+            else {
+                ct->state = POK_STATE_STOPPED;
+                printf("thread %d miss its deadline, kill this thread\n", index);
+            }
+        }
     }
 
     earliest_ddl = -1;

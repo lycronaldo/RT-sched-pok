@@ -18,6 +18,7 @@ int main() {
 
     tattr.period = SCHED_NUM(15);
     tattr.deadline = SCHED_NUM(10);
+    tattr.arrive_time = 3;
     tattr.time_capacity = 5;
     tattr.priority = 42;
     tattr.entry = task1;
@@ -25,6 +26,7 @@ int main() {
 
     tattr.period = SCHED_NUM(20);
     tattr.deadline = SCHED_NUM(15);
+    tattr.arrive_time = 5;
     tattr.time_capacity = 8;
     tattr.priority = 42;
     tattr.entry = task2;
@@ -32,6 +34,7 @@ int main() {
 
     tattr.period = SCHED_NUM(30);
     tattr.deadline = SCHED_NUM(25);
+    tattr.arrive_time = 8;
     tattr.time_capacity = 10;
     tattr.priority = 42;
     tattr.entry = task3;
