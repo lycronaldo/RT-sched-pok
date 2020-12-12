@@ -71,3 +71,51 @@
 
 * 最后，如果没有可运行的线程，则返回 `IDLE_THREAD`
 
+### 1.2 EDF调度
+
+**环境设置**
+
+* 设置`POK_CONFIG_NB_PARTITIONS`为1，我们只需要一个分区即可。
+*  修改内核时钟中断为每1ms触发一次，`POK_TIMER_QUANTUM`修改为1，即每个tick (1ms)都会出发一次调度。
+
+**实现**
+
+* 由于在原来的pok内核中，并没有用到thread的`deadline`属性，只是在thread的初始化的时候初始化了一下，于是为了使用EDF调度算法，我们需要把这个属性利用起来，同时新增一个属性`deadline_actual`，用于表示每个`period`内绝对的deadline时间。
+* 直接使用`time_capacity`来表示每个线程所需要的执行时间，`period`表示每个线程的周期，`deadline`表示每个`period`内的deadline时间，`deadline_actual`表示绝对deadline时间，value为`period开始时间 + deadline`。
+* 算法的基本思想，就是在每个tick触发调度时，检查当前partition的每一个thread是否miss了`deadline_actual`，如果miss了，就简单的将其状态设为`POK_STATE_STOPPED`，不再执行，如果一个线程成功地在其`deadline_actual`之前完成了，那么就正常地将其状态设置为`POK_STATE_WAIT_NEXT_ACTIVATION`。然后再次遍历每一个线程，找出其中`deadline_actual`最小的，选择这个线程进行调度，若没有可执行的线程，那么就选择`idle_thread`。
+
+``` c
+uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread,
+                           const uint32_t current_thread) {
+		/* 前面的不重要的代码均省略 */
+    for (index = index_low; index <= index_high; ++index) {
+      	ct = &pok_threads[index];
+        if ((ct->deadline_actual > 0 && ct->state == POK_STATE_RUNNABLE)) {
+            if (ct->remaining_time_capacity == 0 && ct->deadline_actual >= now) {
+                ct->state = POK_STATE_WAIT_NEXT_ACTIVATION;
+                printf("thread %d finished sucessfully\n", index);
+            }
+            if (ct->deadline_actual >= now)
+              	continue;
+            else {
+                ct->state = POK_STATE_STOPPED;
+                printf("thread %d miss its deadline, kill this thread\n", index);
+            }
+        }
+    }
+    earliest_ddl = -1;
+    for (index = index_low; index <= index_high; ++index) {
+        ct = &pok_threads[index];
+        if (ct->state != POK_STATE_RUNNABLE)
+            continue;
+        if (ct->deadline_actual < earliest_ddl) {
+            earliest_ddl = ct->deadline_actual;
+            res = index;
+        }
+    }
+    if (earliest_ddl == (uint64_t)-1)
+        res = IDLE_THREAD;
+    return res;
+}
+```
+
