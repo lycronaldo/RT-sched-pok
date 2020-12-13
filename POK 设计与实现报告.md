@@ -149,7 +149,7 @@ for (i = 0; i < new_partition->nthreads; i++) {
 
 ### 3.1 抢占式优先级调度场景
 
-**场景设置：**由于实时系统在 cyber physical system 中应用广泛，所以我们设计的应用场景就是现在非常流行的自动驾驶无人机。在这个简化的无人机系统中，一共有三个任务需要并发的运行，分别是：
+**场景设置:**由于实时系统在 cyber physical system 中应用广泛，所以我们设计的应用场景就是现在非常流行的自动驾驶无人机。在这个简化的无人机系统中，一共有三个任务需要并发的运行，分别是：
 
 * 网络收发包线程：负责网络的收发包。这个线程的特点是，运行的周期十分频繁，但是任务执行的时间很短（utilization比较低）。
 * 飞行控制线程：负责障碍物的检测、飞行路线的计算任务。这个线程的特点是，运行的周期长，一次运行执行的时间也很长，而且该任务的关键性非常高，即出错的代价非常高。
@@ -165,11 +165,11 @@ for (i = 0; i < new_partition->nthreads; i++) {
 | **飞行控制线程**   | 25            | 1000   | 1        |
 | **视频数据传输**   | 50            | 1000   | 2        |
 
-**注：**POK的 timer interrupt 已经修改过，现在是 1 ms 触发一次 timer interrupt（1 个 tick），`POK_TIMER_QUANTUM`（20）次 timer interrupt 后触发 `pok_sched`，会给 `thread->remaining_time_capacity` 减 1。也就是说 time_capacity 以20个 tick 为单位。同时 period 是以1个 tick 为单位的。
+**注:**POK的 timer interrupt 已经修改过，现在是 1 ms 触发一次 timer interrupt（1 个 tick），`POK_TIMER_QUANTUM`（20）次 timer interrupt 后触发 `pok_sched`，会给 `thread->remaining_time_capacity` 减 1。也就是说 time_capacity 以20个 tick 为单位。同时 period 是以1个 tick 为单位的。
 
 ### 3.2 抢占式EDF调度场景
 
-**场景设置：**带触控板的风扇控制器
+**场景设置:**带触控板的风扇控制器
 
 * GUI线程：负责与用户的交互。每 15 ms 运行一次，每次运行时间为 5 ms，deadline 为 10 ms。
 * 电机控制线程：负责根据用户的输入，实时的设置系统参数（比如转速、定时等）。每 20 ms 运行一次，每次运行时间为 8 ms，deadline 为 15 ms。
@@ -183,5 +183,5 @@ for (i = 0; i < new_partition->nthreads; i++) {
 | 线程2          | 8             | 20     | 15       | 42       |
 | 电机控制线程   | 10            | 30     | 25       | 42       |
 
-**注：**时钟中断为1ms触发一次，每次时钟中断均会触发调度。若一个进程错过了其deadline，就将它kill掉。
+**注:**时钟中断为1ms触发一次，每次时钟中断均会触发调度。若一个进程错过了其deadline，就将它kill掉。
 
