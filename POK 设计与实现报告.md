@@ -145,3 +145,34 @@ for (i = 0; i < new_partition->nthreads; i++) {
 }
 ```
 
+## 3. MLFQ算法简述
+
+**历史**
+
+* MLFQ算法是指 Multilevel Feedback Queue，即多级反馈队列。
+
+* The Multi-level Feedback Queue (MLFQ) scheduler was first described by Corbato et al. in 1962 in a system known as the Compatible Time-Sharing System (CTSS), and this work, along with later work on Multics, led the ACM to award Corbato its highest honor, the Turing Award. The scheduler has subsequently been refined throughout the years to the implementations you will encounter in some modern systems.
+
+**关键问题**
+
+* How can we design a scheduler that both minimizes response time for interactive jobs while also minimizing turnaround time without a priori knowledge of job length?
+
+**算法细节**
+
+* it has multiple levels of queues, and uses feedback to determine the priority of a given job.
+
+* History is its guide: pay attention to how jobs behave over time and treat them accordingly.
+
+* 具体规则
+
+  1. If Priority(A) > Priority(B), A runs (B doesn’t).
+  2. If Priority(A) = Priority(B), A & B run in round-robin fashion using the time slice (quantum length) of the given queue.
+  3. When a job enters the system, it is placed at the highest priority (the topmost queue).
+
+  4. Once a job uses up its time allotment at a given level (regardless of how many times it has given up the CPU), its priority is reduced (i.e., it moves down one queue).
+  5. After some time period S, move all the jobs in the system to the topmost queue.
+
+**MLFQ算法特性**
+
+* instead of demanding a priori knowledge of the nature of a job, it observes the execution of a job and prioritizes it accordingly. In this way, it manages to achieve the best of both worlds: it can deliver excellent overall performance (similar to SJF/STCF) for short-running interactive jobs, and is fair and makes progress for long-running CPU-intensive workloads.
+
