@@ -128,9 +128,9 @@ uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high,
 
 **实现**
 
-* 在`pok_thread_t`, `pok_thread_attr_t`这两个结构体中添加了`arrive_time`属性, 表示线程到达的绝对时间
-* 在线程初始化时, 也就是在`pok_partition_thread_create`中初始化此字段
-* 在每次时钟中断触发调度时, 都检查一次所有线程的arrive_time是否小于等于当前时间, 如果小于,则将其状态改为`POK_STATE_RUNNABLE`, 否则, 将其状态改为`POK_STATE_STOPPED`
+* 在`pok_thread_t`, `pok_thread_attr_t`这两个结构体中添加了`arrive_time`属性, 表示线程到达的绝对时间。
+* 在线程初始化时, 也就是在`pok_partition_thread_create`中初始化此字段。
+* 在每次时钟中断触发调度时, 都检查一次所有线程的arrive_time是否小于等于当前时间, 如果小于,则将其状态改为`POK_STATE_RUNNABLE`, 否则, 将其状态改为`POK_STATE_STOPPED`。
 
 ```c
 for (i = 0; i < new_partition->nthreads; i++) {
@@ -144,4 +144,44 @@ for (i = 0; i < new_partition->nthreads; i++) {
         }
 }
 ```
+
+## 3. 应用场景简述
+
+### 3.1 抢占式优先级调度场景
+
+**场景设置：**由于实时系统在 cyber physical system 中应用广泛，所以我们设计的应用场景就是现在非常流行的自动驾驶无人机。在这个简化的无人机系统中，一共有三个任务需要并发的运行，分别是：
+
+* 网络收发包线程：负责网络的收发包。这个线程的特点是，运行的周期十分频繁，但是任务执行的时间很短（utilization比较低）。
+* 飞行控制线程：负责障碍物的检测、飞行路线的计算任务。这个线程的特点是，运行的周期长，一次运行执行的时间也很长，而且该任务的关键性非常高，即出错的代价非常高。
+* 视频数据传输：负责将采集到的视频数据传回地面。这个线程的特点是时间敏感性不高，而且没有成功执行的代价也不高，所以可以在 cpu 空闲时占用cpu。
+
+结合以上三个线程的特点，我们可以分析出以下结论。飞行控制线程的关键性很高，但是一次执行的时间较长，这可能阻塞运行的网络收发包线程。所以我们需要让网络收发包拥有更高的优先级，让它能够抢占飞行控制线程获得 cpu 控制权，但是同时我们也要限制其 time capacity 保证飞行控制线程也能够顺利完成。而视频数据传输作为一个 best effort 线程，给予其 100% 的 cpu 利用率，但是限制它的优先级为最低，这样让它能够在另外两个线程不占用 cpu 时随意地使用 cpu。
+
+**线程属性：**
+
+|                    | time_capacity | period | priority |
+| :----------------- | ------------- | ------ | -------- |
+| **网络收发包线程** | 1             | 100    | 0        |
+| **飞行控制线程**   | 25            | 1000   | 1        |
+| **视频数据传输**   | 50            | 1000   | 2        |
+
+**注：**POK的 timer interrupt 已经修改过，现在是 1 ms 触发一次 timer interrupt（1 个 tick），`POK_TIMER_QUANTUM`（20）次 timer interrupt 后触发 `pok_sched`，会给 `thread->remaining_time_capacity` 减 1。也就是说 time_capacity 以20个 tick 为单位。同时 period 是以1个 tick 为单位的。
+
+### 3.2 抢占式EDF调度场景
+
+**场景设置：**带触控板的风扇控制器
+
+* GUI线程：负责与用户的交互。每 15 ms 运行一次，每次运行时间为 5 ms，deadline 为 10 ms。
+* 电机控制线程：负责根据用户的输入，实时的设置系统参数（比如转速、定时等）。每 20 ms 运行一次，每次运行时间为 8 ms，deadline 为 15 ms。
+* 电机驱动线程：负责驱动风扇的电机运转。每 30 ms 运行一次，每次运行时间为 10 ms，deadline 为 25 ms。
+
+**线程属性**：
+
+|                | Time_capacity | Period | Deadline | Priority |
+| -------------- | ------------- | ------ | -------- | -------- |
+| 网络收发包线程 | 5             | 15     | 10       | 42       |
+| 线程2          | 8             | 20     | 15       | 42       |
+| 电机控制线程   | 10            | 30     | 25       | 42       |
+
+**注：**时钟中断为1ms触发一次，每次时钟中断均会触发调度。若一个进程错过了其deadline，就将它kill掉。
 
