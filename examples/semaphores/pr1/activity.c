@@ -18,28 +18,54 @@
 #include <core/thread.h>
 #include <core/semaphore.h>
 #include <types.h>
-
+#include "activity.h"
 extern uint8_t sid;
 uint8_t val;
 
-void* pinger_job() {
-    pok_ret_t ret;
-    while (1) {
-        printf("P1T1: I will signal semaphores\n");
-        ret = pok_sem_signal(sid);
-        printf("P1T1: pok_sem_signal, ret=%d\n", ret);
-        pok_thread_sleep(2000000);
+// void* pinger_job() {
+//     pok_ret_t ret;
+//     while (1) {
+//         printf("P1T1: I will signal semaphores\n");
+//         ret = pok_sem_signal(sid);
+//         printf("P1T1: pok_sem_signal, ret=%d\n", ret);
+//         pok_thread_sleep(2000000);
+//     }
+// }
+
+// void* pinger_job2() {
+//     pok_ret_t ret;
+//     while (1) {
+//         printf("P1T2: I will wait for the semaphores\n");
+//         ret = pok_sem_wait(sid, 0);
+//         printf("P1T2: pok_sem_wait, ret=%d\n", ret);
+//         ret = pok_sem_wait(sid, 0);
+//         printf("P1T2: pok_sem_wait, ret=%d\n", ret);
+//         pok_thread_sleep(2000000);
+//     }
+// }
+
+void *receive_signal() {
+    //pok_ret_t ret;
+    while(1) {
+        //printf("P1T1: I am detecting obstacal\n");
+        //pok_thread_sleep(3000);
     }
+    return 0;
 }
 
-void* pinger_job2() {
-    pok_ret_t ret;
-    while (1) {
-        printf("P1T2: I will wait for the semaphores\n");
-        ret = pok_sem_wait(sid, 0);
-        printf("P1T2: pok_sem_wait, ret=%d\n", ret);
-        ret = pok_sem_wait(sid, 0);
-        printf("P1T2: pok_sem_wait, ret=%d\n", ret);
-        pok_thread_sleep(2000000);
+void *flying_control() {
+    //pok_ret_t ret;
+    while(1) {
+        //printf("P1T2: I am calculating flying route\n");
+        //pok_thread_sleep(5000);
     }
+    return 0;
+}
+void *transfer_video_stream() {
+    //pok_ret_t ret;
+    while(1) {
+        //printf("P1T2: I am calculating flying route\n");
+        //pok_thread_sleep(5000);
+    }
+    return 0;
 }
