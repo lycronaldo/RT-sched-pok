@@ -62,6 +62,8 @@ typedef struct {
     pok_state_t state;
     uint64_t end_time;
     uint64_t wakeup_time;
+    int weight; // for weighted_rr scheduler
+    int origin_weight;
 #ifdef POK_NEEDS_SCHED_HFPPS
     uint64_t payback; /**< Payback for HFPPS scheduling algorithm */
 #endif /* POK_NEEDS_SCHED_HFPPS */

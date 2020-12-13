@@ -490,6 +490,104 @@ uint32_t pok_sched_preemptive_priority(const uint32_t index_low, const uint32_t 
     return res;
 }
 
+static int gcd(int a, int b) {
+    if (a == b)
+        return a;
+    int divide = (a > b) ? a : b, devider = (a < b) ? a : b;
+    int res = divide / devider, tail = devide % devider;
+    while(tail) {
+        divide = devider;
+        devider = tail;
+        res = divide / devider;
+        tail = devide % devider;
+    }
+    return divider;
+}
+
+static int gcd_weight(const uint32_t index_low, const uint32_t index_high) {
+    int res = 0;
+    uint32_t i1, i2;
+    i1 = index_low;
+    while (true) {
+        while (pok_threads[i1] != POK_STATE_RUNNABLE)
+            ++i1
+        if (!res)
+            res = pok_threads[i1].weight;
+        i2 = i1 + 1;
+        if (i2 > index_high)
+            break;
+        while (pok_threads[i2] != POK_STATE_RUNNABLE)
+            ++i2;
+        res = gcd(pok_threads[i1].weight, pok_threads[i2].weight);
+        i1 = i2;
+    }
+    return res;
+}
+
+static int max_weight(const uint32_t index_low, const uint32_t index_high) {
+    int max_weight, current_weight;
+    max_weight = 0;
+    uint32_t i;
+    for (i = index_low; i <= index_high; ++i) {
+        if (pok_threads[i].state != POK_STATE_RUNNABLE)
+            continue;
+        current_weight = pok_threads[i].weight;
+        if (max_weight < current_weight)
+            max_weight = current_weight;
+    }
+    return max_weight;
+}
+
+static void recharge_timeslice(const uint32_t index_low, const uint32_t index_high) {
+    uint32_t i;
+    for (i = index_low; i <= index_high; ++i)
+        pok_threads[i].weight = pok_threads[i].origin_weight;
+}
+
+uint32_t pok_sched_part_weighted_rr(const uint32_t index_low, const uint32_t index_high, 
+                                    const uint32_t __attribute__((unused)) prev_thread, 
+                                    const uint32_t __attribute__((unused)) current_thread) {
+    uint32_t res;
+    uint32_t start = (current_thread == IDLE_THREAD) ? prev_thread : current_thread;
+    uint32_t i = start + 1;
+    res = i;
+    int current_weight = 0;
+
+    if ((pok_threads[current_thread].remaining_time_capacity > 0)
+        && (pok_threads[current_thread].state == POK_STATE_RUNNABLE)) {
+        return current_thread;
+    }
+
+select_loop:
+    while (i != start) {
+        if (pok_threads[i].state == POK_STATE_RUNNABLE) {
+            if (i == index_low) {
+                current_weight -= gcd_weight(index_low, index_high);
+                if (current_weight <= 0) {
+                    current_weight = max_weight(index_low, index_high);
+                    if (current_weight == 0)
+                        recharge_timeslice(index_low, index_high);
+                }
+            }
+            if (pok_threads[i].weight >= current_weight) {
+                res = i;
+                break;
+            }
+        }
+
+        i += 1;
+        if (i > index_high) { 
+            i = index_low;
+        }
+    }
+
+    if (res == i) {
+        recharge_timeslice();
+        res = IDLE_THREAD;
+    }
+    return res;
+}
+
 #if defined(POK_NEEDS_LOCKOBJECTS) || defined(POK_NEEDS_PORTS_QUEUEING) || defined(POK_NEEDS_PORTS_SAMPLING)
 void pok_sched_unlock_thread(const uint32_t thread_id) {
     pok_threads[thread_id].state = POK_STATE_RUNNABLE;
