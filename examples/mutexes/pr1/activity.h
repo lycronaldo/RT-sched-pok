@@ -16,7 +16,8 @@
 
 #ifndef __POK_USER_GENERATED_ACTIVITY_H_
 #define __POK_USER_GENERATED_ACTIVITY_H_
-void* pinger_job();
-void* pinger_job2();
+void* thread1_job();
+void* thread2_job();
+void* thread3_job();
 
 #endif

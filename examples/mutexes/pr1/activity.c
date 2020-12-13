@@ -22,32 +22,14 @@
 extern uint8_t mid;
 uint8_t val;
 
-void* pinger_job() {
-    pok_ret_t ret;
-    while (1) {
-        ret = pok_mutex_lock(mid);
-        printf("mutex lock, ret=%d\n", ret);
-        val = 10;
-        printf("Hello, I'm task one in partition one, before sleep val=%d\n", val);
-        pok_thread_sleep(100000);
-        printf("Hello, I'm task one in partition one, after sleep val=%d\n", val);
-        ret = pok_mutex_unlock(mid);
-        printf("mutex unlock, ret=%d\n", ret);
-        pok_thread_sleep(1000000);
-    }
+void* thread1_job() {
+    while (1);
 }
 
-void* pinger_job2() {
-    pok_ret_t ret;
-    while (1) {
-        ret = pok_mutex_lock(mid);
-        printf("mutex lock, ret=%d\n", ret);
-        printf("Hello, I'm task two in partition one, value before change=%d\n", val);
-        val = 5;
-        pok_thread_sleep(200000);
-        printf("Hello, I'm task two in partition one, value after change=%d\n", val);
-        ret = pok_mutex_unlock(mid);
-        printf("mutex unlock, ret=%d\n", ret);
-        pok_thread_sleep(500000);
-    }
+void* thread2_job() {
+    while (1);
+}
+
+void* thread3_job() {
+    while(1);
 }

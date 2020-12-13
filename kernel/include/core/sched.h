@@ -17,9 +17,6 @@
 #ifndef __POK_SCHED_H__
 #define __POK_SCHED_H__
 
-#define POK_NEEDS_SCHED
-#define POK_NEEDS_THREADS
-
 #if defined(POK_NEEDS_SCHED) || defined(POK_NEEDS_THREADS)
 
 #include <types.h>

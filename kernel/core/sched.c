@@ -462,7 +462,7 @@ uint32_t pok_sched_preemptive_priority(const uint32_t index_low, const uint32_t 
     uint32_t tmp, from;
     uint16_t highest_priority = 0x100;
 
-    printf("index_low:%d, index_high:%d\n", index_low, index_high);
+    // printf("index_low:%d, index_high:%d\n", index_low, index_high);
     if (current_thread == IDLE_THREAD) {
         res = prev_thread;
     } else {
@@ -491,16 +491,19 @@ uint32_t pok_sched_preemptive_priority(const uint32_t index_low, const uint32_t 
 }
 
 static int gcd(int a, int b) {
-    if (a == b)
-        return a;
-    int divide = (a > b) ? a : b, devider = (a < b) ? a : b;
-    int res = divide / devider, tail = devide % devider;
+    if (a == b || a == 0 || b == 0)
+        return (a == 0) ? a : b;
+    int divide = (a > b) ? a : b;
+    int divider = (a < b) ? a : b;
+    int res = divide / divider;
+    int tail = divide % divider;
     while(tail) {
-        divide = devider;
-        devider = tail;
-        res = divide / devider;
-        tail = devide % devider;
+        divide = divider;
+        divider = tail;
+        res = divide / divider;
+        tail = divide % divider;
     }
+    res++; // avoid unused warning
     return divider;
 }
 
@@ -508,17 +511,17 @@ static int gcd_weight(const uint32_t index_low, const uint32_t index_high) {
     int res = 0;
     uint32_t i1, i2;
     i1 = index_low;
-    while (true) {
-        while (pok_threads[i1] != POK_STATE_RUNNABLE)
-            ++i1
+    while (1) {
+        while (pok_threads[i1].state != POK_STATE_RUNNABLE)
+            ++i1;
         if (!res)
             res = pok_threads[i1].weight;
         i2 = i1 + 1;
         if (i2 > index_high)
             break;
-        while (pok_threads[i2] != POK_STATE_RUNNABLE)
+        while (pok_threads[i2].state != POK_STATE_RUNNABLE)
             ++i2;
-        res = gcd(pok_threads[i1].weight, pok_threads[i2].weight);
+        res = gcd(res, pok_threads[i2].weight);
         i1 = i2;
     }
     return res;
@@ -541,32 +544,33 @@ static int max_weight(const uint32_t index_low, const uint32_t index_high) {
 static void recharge_timeslice(const uint32_t index_low, const uint32_t index_high) {
     uint32_t i;
     for (i = index_low; i <= index_high; ++i)
-        pok_threads[i].weight = pok_threads[i].origin_weight;
+        if (pok_threads[i].state == POK_STATE_RUNNABLE)
+            pok_threads[i].weight = pok_threads[i].origin_weight;
 }
 
 uint32_t pok_sched_part_weighted_rr(const uint32_t index_low, const uint32_t index_high, 
                                     const uint32_t __attribute__((unused)) prev_thread, 
                                     const uint32_t __attribute__((unused)) current_thread) {
     uint32_t res;
-    uint32_t start = (current_thread == IDLE_THREAD) ? prev_thread : current_thread;
-    uint32_t i = start + 1;
+    uint32_t i = index_low + 1;
     res = i;
     int current_weight = 0;
 
-    if ((pok_threads[current_thread].remaining_time_capacity > 0)
-        && (pok_threads[current_thread].state == POK_STATE_RUNNABLE)) {
-        return current_thread;
-    }
+    // if ((pok_threads[current_thread].remaining_time_capacity > 0)
+    //     && (pok_threads[current_thread].state == POK_STATE_RUNNABLE)) {
+    //     return current_thread;
+    // }
 
-select_loop:
-    while (i != start) {
+    while (i < index_high) {
         if (pok_threads[i].state == POK_STATE_RUNNABLE) {
-            if (i == index_low) {
-                current_weight -= gcd_weight(index_low, index_high);
+            if (i == index_low + 1) {
+                int gcd = gcd_weight(index_low + 1, index_high - 1);
+                printf("gcd weight: %d\n", gcd);
+                current_weight -= gcd;
                 if (current_weight <= 0) {
-                    current_weight = max_weight(index_low, index_high);
+                    current_weight = max_weight(index_low + 1, index_high - 1);
                     if (current_weight == 0)
-                        recharge_timeslice(index_low, index_high);
+                        break;
                 }
             }
             if (pok_threads[i].weight >= current_weight) {
@@ -576,14 +580,14 @@ select_loop:
         }
 
         i += 1;
-        if (i > index_high) { 
-            i = index_low;
-        }
     }
 
-    if (res == i) {
-        recharge_timeslice();
+    if (res != i) {
+        recharge_timeslice(index_low + 1, index_high - 1);
         res = IDLE_THREAD;
+    } else {
+        pok_threads[res].weight--;
+        printf("[sched result] sched out thread: %d, sched in thread: %d\n", current_thread, res);
     }
     return res;
 }

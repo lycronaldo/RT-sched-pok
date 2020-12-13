@@ -65,7 +65,7 @@ void pok_partition_setup_scheduler(const uint8_t pid) {
         pok_partitions[pid].sched_func = &pok_sched_preemptive_priority;
         break;
     case POK_SCHED_WEIGHT_RR:
-        pok_partition[pid].sched_func = &pok_sched_part_weighted_rr;
+        pok_partitions[pid].sched_func = &pok_sched_part_weighted_rr;
         break;
         /*
          * Default scheduling algorithm is Round Robin.

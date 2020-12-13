@@ -62,8 +62,6 @@ typedef struct {
     pok_state_t state;
     uint64_t end_time;
     uint64_t wakeup_time;
-    int weight; // for weighted_rr scheduler
-    int origin_weight;
 #ifdef POK_NEEDS_SCHED_HFPPS
     uint64_t payback; /**< Payback for HFPPS scheduling algorithm */
 #endif /* POK_NEEDS_SCHED_HFPPS */
@@ -74,6 +72,8 @@ typedef struct {
     uint8_t base_priority;
     /* stack pointer
      * FIXME: this is platform-dependent code, we have to handle that ! */
+    int weight; /* Weight of weighted_rr */
+    int origin_weight; /* Origin Weight of each thread */
 } pok_thread_t;
 
 typedef struct {
@@ -84,6 +84,7 @@ typedef struct {
     uint64_t time_capacity;
     uint32_t stack_size;
     pok_state_t state;
+    int weight; /* Weight of weighted_rr */
 } pok_thread_attr_t;
 /*
  * Attributes given to create a thread

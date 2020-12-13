@@ -164,6 +164,12 @@ pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr
     if (attr->deadline > 0) {
         pok_threads[id].deadline = attr->deadline;
     }
+    
+    if (attr->weight > 0) {
+        printf("[Initialize the weight] weight: %d\n", attr->weight);
+        pok_threads[id].weight = pok_threads[id].origin_weight = attr->weight;
+    }
+    
 
 #ifdef POK_NEEDS_SCHED_HFPPS
     pok_threads[id].payback = 0;

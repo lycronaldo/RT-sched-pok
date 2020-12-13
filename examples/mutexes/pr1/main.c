@@ -16,7 +16,7 @@
 
 #include <libc/stdio.h>
 #include <core/thread.h>
-#include <core/mutex.h>
+#include <core/partition.h>
 #include <types.h>
 #include "activity.h"
 
@@ -27,19 +27,28 @@ int main() {
     pok_ret_t ret;
     pok_thread_attr_t tattr;
 
-    tattr.priority = 42;
-    tattr.entry = pinger_job;
+    tattr.period = 10;
+    tattr.time_capacity = 10;
+    tattr.weight = 4;
+    tattr.entry = thread1_job;
 
     ret = pok_thread_create(&tid, &tattr);
 
-    tattr.priority = 42;
-    tattr.entry = pinger_job2;
+    tattr.period = 15;
+    tattr.time_capacity = 8;
+    tattr.weight = 3;
+    tattr.entry = thread2_job;
 
     ret = pok_thread_create(&tid, &tattr);
 
-    ret = pok_mutex_create(&mid, NULL);
-    printf("pok_mutex_create return=%d, mid=%d\n", ret, mid);
+    tattr.period = 20;
+    tattr.time_capacity = 6;
+    tattr.weight = 2;
+    tattr.entry = thread3_job;
 
+    ret = pok_thread_create(&tid, &tattr);
+
+    pok_partition_set_mode(POK_PARTITION_MODE_NORMAL);
     pok_thread_wait_infinite();
 
     return (0);
