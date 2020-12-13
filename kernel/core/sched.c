@@ -612,18 +612,21 @@ uint32_t enqueue(uint32_t thread_index, uint32_t level)
 {
     queue *current_queue = &mlfq[level];
     current_queue->q[current_queue->tail++] = thread_index;
+    printf("thread:%d enqueue level: %d\n", thread_index, level);
     return thread_index;
 }
 
 uint32_t dequeue(uint32_t level)
 {
     queue *current_queue = &mlfq[level];
+    printf("thread:%d dequeue from level:%d\n", current_queue->q[current_queue->head], level);
     return current_queue->q[current_queue->head++];
 }
 
 int head(int level)
 {
     queue *current_queue = &mlfq[level];
+    printf("get head:%d frome level:%d\n", current_queue->q[current_queue->head], level);
     return current_queue->q[current_queue->head];
 }
 
@@ -636,7 +639,6 @@ int is_empty(int level)
 #define time_slice_in_level(x) ((x+1) * 2)
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
-static int first_call = 1;
 
 uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high, uint32_t prev_thread,
                            const uint32_t current_thread) {
@@ -664,22 +666,21 @@ uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high
 
     ct = &pok_threads[current_thread];
     /* current thread finished */
-    if (ct->remaining_time_capacity <= 0 ) {
+    if (current_thread == IDLE_THREAD || current_thread == 0) {
+        should_sched = 1;
+    } else if (ct->remaining_time_capacity <= 0 ) {
+        printf("current thread %d time capacity <= 0\n", current_thread);
         dequeue(ct->level);
         ct->in_queue = 0;
         should_sched = 1;
     }/* current thread exhaust its time_slice */
     else if (ct->mlfq_time_slice <= 0) {
+        printf("current thread: %d time slice <= 0\n", current_thread);
         dequeue(ct->level);
         enqueue(current_thread, min(ct->level + 1, 3));
         ct->level = min(ct->level + 1, 3);
         ct->mlfq_time_slice = time_slice_in_level(ct->level);
         should_sched = 1;
-    }
-    /* if this function is being called the first time, we should also sched */
-    if (first_call == 1) {
-        should_sched = 1;
-        first_call = 0;
     }
 
     /* find the head in highest priority queue */
@@ -690,9 +691,10 @@ uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high
                 break;
             }
         }
+    } else {
+        res = current_thread;
     }
 
-    should_sched = 0;
     /* if there is no thread runnable */
     if (res == -1)
         res = IDLE_THREAD;

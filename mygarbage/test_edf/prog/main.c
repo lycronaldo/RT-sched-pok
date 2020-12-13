@@ -15,27 +15,31 @@ int main() {
     uint8_t tid;
     pok_thread_attr_t tattr;
     memset(&tattr, 0, sizeof(pok_thread_attr_t));
+    int ret;
 
     tattr.period = SCHED_NUM(15);
     tattr.deadline = SCHED_NUM(10);
     tattr.time_capacity = 5;
     tattr.priority = 42;
     tattr.entry = task1;
-    pok_thread_create(&tid, &tattr);
+    ret = pok_thread_create(&tid, &tattr);
+    printf("[P1] pok_thread_create (1) return=%d\n", ret);
 
     tattr.period = SCHED_NUM(20);
     tattr.deadline = SCHED_NUM(15);
     tattr.time_capacity = 8;
     tattr.priority = 42;
     tattr.entry = task2;
-    pok_thread_create(&tid, &tattr);
+    ret = pok_thread_create(&tid, &tattr);
+    printf("[P1] pok_thread_create (2) return=%d\n", ret);
 
     tattr.period = SCHED_NUM(30);
     tattr.deadline = SCHED_NUM(25);
     tattr.time_capacity = 10;
     tattr.priority = 42;
     tattr.entry = task3;
-    pok_thread_create(&tid, &tattr);
+    ret = pok_thread_create(&tid, &tattr);
+    printf("[P1] pok_thread_create (2) return=%d\n", ret);
 
     pok_partition_set_mode(POK_PARTITION_MODE_NORMAL);
     pok_thread_wait_infinite();
