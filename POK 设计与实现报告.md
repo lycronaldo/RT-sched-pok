@@ -185,3 +185,106 @@ for (i = 0; i < new_partition->nthreads; i++) {
 
 **注：**时钟中断为1ms触发一次，每次时钟中断均会触发调度。若一个进程错过了其deadline，就将它kill掉。
 
+
+
+## 4. MLFQ算法简述
+
+## 5. MLFQ算法实现简述
+
+**环境设置：**
+
+* 设置`POK_CONFIG_NB_PARTITIONS`为1，我们只需要一个分区即可。
+* 修改内核时钟中断为每1ms触发一次，`POK_TIMER_QUANTUM`修改为1，即每个tick (1ms)都会出发一次调度。
+
+**实现：**
+
+* 我们在 POK 中实现了 MLFQ 调度算法。
+* 我们目前只设置了3级队列，在`sched.c`中使用一个静态全局变量来定义 `static queue mlfq[3];`
+
+* 队列相关接口（都是简单数据结构的实现，细节不再赘述）
+  * `uint32_t enqueue(uint32_t thread_index, uint32_t level)  `
+  * `uint32_t dequeue(uint32_t level)`
+  * `uint32_t head(int level)    //拿到第level级队列的队头`
+  * `int is_empty(int level)`
+* 每级队列具有不同的优先级，队列内部采用 round robin 的调度策略
+* 只有一个线程的 `remaing_time_capacity` 小于等于0或者当前时间片耗尽时才会选取新的线程进行执行。
+* 每级队列使用的时间片采用宏定义的方式来实现 `#define time_slice_in_level(x) ((x+1) * 2)` 
+* 对线程结构体添加了3个字段
+
+```c
+ 		/* mlfq */
+    uint32_t in_queue;         // 表示一个线程目前是否在队列当中
+    uint32_t level;		         // 表示一个线程目前处于第几级队列当中
+    uint64_t mlfq_time_slice;  // 表示当前进程剩余时间片
+```
+
+* 对 `pok_elect_thread` 的修改
+  * 除了将 `remaining_time_capacity` 减1
+
+**代码详解：**
+
+```c
+uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high, uint32_t prev_thread,
+                           const uint32_t current_thread) {
+    uint64_t now = POK_GETTICK(); 
+    uint32_t index, level, should_sched;
+    int res;
+    pok_thread_t *ct;
+
+    should_sched = 0;
+    res = prev_thread;
+    res = -1;
+  
+    printf("mlfq sched start, current tick %d\n", now);
+
+    for (index = index_low; index <= index_high; ++index) {
+        ct = &pok_threads[index];
+        if (ct->state == POK_STATE_RUNNABLE && ct->in_queue == 0) {
+            enqueue(index, 0);
+            ct->level = 0;
+            ct->in_queue = 1;
+            ct->mlfq_time_slice = time_slice_in_level(0);
+        }
+    }
+
+    ct = &pok_threads[current_thread];
+    /* current thread finished */
+    if (current_thread == IDLE_THREAD || current_thread == 0) {
+        should_sched = 1;
+    } else if (ct->remaining_time_capacity <= 0 ) {
+        printf("current thread %d time capacity <= 0\n", current_thread);
+        dequeue(ct->level);
+        ct->in_queue = 0;
+        should_sched = 1;
+    }/* current thread exhaust its time_slice */
+    else if (ct->mlfq_time_slice <= 0) {
+        printf("current thread: %d time slice <= 0\n", current_thread);
+        dequeue(ct->level);
+        enqueue(current_thread, min(ct->level + 1, 3));
+        ct->level = min(ct->level + 1, 3);
+        ct->mlfq_time_slice = time_slice_in_level(ct->level);
+        should_sched = 1;
+    }
+
+    /* find the head in highest priority queue */
+    if (should_sched == 1) {
+        for (level = 0; level < 3; ++level) {
+            if (!is_empty(level)) {
+                res = head(level);
+                break;
+            }
+        }
+    } else {
+        res = current_thread;
+    }
+
+    /* if there is no thread runnable */
+    if (res == -1)
+        res = IDLE_THREAD;
+
+    // print_thread_info(res);
+    printf("mlfq sched end, select %d\n", res);
+    return res;
+}
+```
+
