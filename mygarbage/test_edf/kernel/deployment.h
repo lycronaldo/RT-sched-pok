@@ -1,9 +1,9 @@
 #pragma once
 
 /* config sched strategy */
-#define POK_NEEDS_SCHED_EDF 1
+#define POK_NEEDS_SCHED_MLFQ 1
 #define POK_CONFIG_PARTITIONS_SCHEDULER \
-    { POK_SCHED_EDF }
+    { POK_SCHED_MLFQ }
 
 #define POK_NEEEDS_DEBUG 1
 

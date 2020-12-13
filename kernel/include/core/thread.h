@@ -73,6 +73,11 @@ typedef struct {
     uint8_t base_priority;
     /* stack pointer
      * FIXME: this is platform-dependent code, we have to handle that ! */
+
+    /* mlfq */
+    uint32_t in_queue;
+    uint32_t level;
+    uint64_t mlfq_time_slice;
 } pok_thread_t;
 
 typedef struct {

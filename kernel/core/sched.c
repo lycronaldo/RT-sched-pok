@@ -247,6 +247,8 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
 #endif
         ) {
             POK_CURRENT_THREAD.remaining_time_capacity = POK_CURRENT_THREAD.remaining_time_capacity - 1;
+            POK_CURRENT_THREAD.mlfq_time_slice = POK_CURRENT_THREAD.mlfq_time_slice - 1;
+
             if (POK_CURRENT_THREAD.remaining_time_capacity <= 0
                 && POK_CURRENT_THREAD.time_capacity > 0) // Wait next activation only for thread
                                                          // with non-infinite capacity (could be
@@ -298,7 +300,7 @@ uint32_t pok_elect_thread(uint8_t new_partition_id) {
 
 #ifdef POK_NEEDS_PARTITIONS
 void pok_sched() {
-    if (POK_GETTICK() >= 60) {
+    if (POK_GETTICK() >= 30) {
         printf("reach time limits\n");
         while (1)
         {
@@ -598,3 +600,104 @@ uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high,
 }
 
 
+typedef struct queue
+{
+    uint32_t q[100];
+    uint32_t head, tail;
+} queue;
+
+static queue mlfq[3];
+
+uint32_t enqueue(uint32_t thread_index, uint32_t level)
+{
+    queue *current_queue = &mlfq[level];
+    current_queue->q[current_queue->tail++] = thread_index;
+    return thread_index;
+}
+
+uint32_t dequeue(uint32_t level)
+{
+    queue *current_queue = &mlfq[level];
+    return current_queue->q[current_queue->head++];
+}
+
+int head(int level)
+{
+    queue *current_queue = &mlfq[level];
+    return current_queue->q[current_queue->head];
+}
+
+int is_empty(int level)
+{
+    queue *current_queue = &mlfq[level];
+    return (current_queue->head == current_queue->tail);
+}
+
+#define time_slice_in_level(x) ((x+1) * 2)
+#define min(x, y) ((x) < (y) ? (x) : (y))
+
+static int first_call = 1;
+
+uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high, uint32_t prev_thread,
+                           const uint32_t current_thread) {
+    uint64_t now = POK_GETTICK(); 
+    uint32_t index, level, should_sched;
+    int res;
+    pok_thread_t *ct;
+
+    should_sched = 0;
+    res = prev_thread;
+    res = -1;
+
+    printf("mlfq sched start, current tick %d\n", now);
+    // print_thread_info(current_thread);
+
+    for (index = index_low; index <= index_high; ++index) {
+        ct = &pok_threads[index];
+        if (ct->state == POK_STATE_RUNNABLE && ct->in_queue == 0) {
+            enqueue(index, 0);
+            ct->level = 0;
+            ct->in_queue = 1;
+            ct->mlfq_time_slice = time_slice_in_level(0);
+        }
+    }
+
+    ct = &pok_threads[current_thread];
+    /* current thread finished */
+    if (ct->remaining_time_capacity <= 0 ) {
+        dequeue(ct->level);
+        ct->in_queue = 0;
+        should_sched = 1;
+    }/* current thread exhaust its time_slice */
+    else if (ct->mlfq_time_slice <= 0) {
+        dequeue(ct->level);
+        enqueue(current_thread, min(ct->level + 1, 3));
+        ct->level = min(ct->level + 1, 3);
+        ct->mlfq_time_slice = time_slice_in_level(ct->level);
+        should_sched = 1;
+    }
+    /* if this function is being called the first time, we should also sched */
+    if (first_call == 1) {
+        should_sched = 1;
+        first_call = 0;
+    }
+
+    /* find the head in highest priority queue */
+    if (should_sched == 1) {
+        for (level = 0; level < 3; ++level) {
+            if (!is_empty(level)) {
+                res = head(level);
+                break;
+            }
+        }
+    }
+
+    should_sched = 0;
+    /* if there is no thread runnable */
+    if (res == -1)
+        res = IDLE_THREAD;
+
+    // print_thread_info(res);
+    printf("mlfq sched end, select %d\n", res);
+    return res;
+}

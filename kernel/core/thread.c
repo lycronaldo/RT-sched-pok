@@ -166,6 +166,9 @@ pok_ret_t pok_partition_thread_create(uint32_t* thread_id, const pok_thread_attr
     }
     pok_threads[id].deadline_actual = -1;
 
+    /* mlfq */
+    pok_threads[id].in_queue = 0;
+
 #ifdef POK_NEEDS_SCHED_HFPPS
     pok_threads[id].payback = 0;
 #endif /* POK_NEEDS_SCHED_HFPPS */
@@ -353,16 +356,18 @@ void print_thread_info(uint32_t id)
     for (id = 0; id < POK_CURRENT_PARTITION.nthreads; id++) {
         pok_thread_t *thread = &pok_threads[POK_CURRENT_PARTITION.thread_index_low + id];
         printf("============== thread %d info start ================\n", id);
-        printf("priority = %d\n", thread->priority);
+        // printf("priority = %d\n", thread->priority);
+        printf("in_queue = %d\n", thread->in_queue);
+        printf("mlfq_time_slice = %d\n", thread->mlfq_time_slice);
         printf("period = %d\n", thread->period);
-        printf("deadline = %d\n", thread->deadline);
-        printf("deadline_actual = %d\n", thread->deadline_actual);
+        // printf("deadline = %d\n", thread->deadline);
+        // printf("deadline_actual = %d\n", thread->deadline_actual);
         printf("time_capacity = %d\n", thread->time_capacity);
         printf("remaining_time_capacity = %d\n", thread->remaining_time_capacity);
         printf("next_activation = %d\n", thread->next_activation);
         printf("state = %d\n", thread->state);
-        printf("end_time = %d\n", thread->end_time);
-        printf("wakeup_time = %d\n", thread->wakeup_time);
+        // printf("end_time = %d\n", thread->end_time);
+        // printf("wakeup_time = %d\n", thread->wakeup_time);
         printf("============== thread %d info end ==================\n", id);
     }
 }
