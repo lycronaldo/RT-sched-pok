@@ -219,7 +219,7 @@ for (i = 0; i < new_partition->nthreads; i++) {
 ```
 
 * 对 `pok_elect_thread` 的修改
-  * 除了将 `remaining_time_capacity` 减1
+  * 除了将 `remaining_time_capacity` 减1之外，还把 `mlfq_time_slice` 减1。
 
 **代码详解：**
 
@@ -237,6 +237,7 @@ uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high
   
     printf("mlfq sched start, current tick %d\n", now);
 
+    /* 遍历所有 thread ，如果有线程变成了 runnable 但是并不在任何队列当中，就把它插入到第一级队列当中*/
     for (index = index_low; index <= index_high; ++index) {
         ct = &pok_threads[index];
         if (ct->state == POK_STATE_RUNNABLE && ct->in_queue == 0) {
@@ -248,16 +249,17 @@ uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high
     }
 
     ct = &pok_threads[current_thread];
-    /* current thread finished */
+    /* 如果当前线程是 IDLE_THEAD 或者为0,那么应该触发调度 */
     if (current_thread == IDLE_THREAD || current_thread == 0) {
         should_sched = 1;
     } else if (ct->remaining_time_capacity <= 0 ) {
+        /* 如果当前线程已经耗尽 time_capacity， 就将其出队，且触发调度 */
         printf("current thread %d time capacity <= 0\n", current_thread);
         dequeue(ct->level);
         ct->in_queue = 0;
         should_sched = 1;
-    }/* current thread exhaust its time_slice */
-    else if (ct->mlfq_time_slice <= 0) {
+    } else if (ct->mlfq_time_slice <= 0) {
+        /* 如果当前线程已经耗尽 time_slice，那么就将其插入下一级队列，且触发调度 */
         printf("current thread: %d time slice <= 0\n", current_thread);
         dequeue(ct->level);
         enqueue(current_thread, min(ct->level + 1, 3));
@@ -266,7 +268,7 @@ uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high
         should_sched = 1;
     }
 
-    /* find the head in highest priority queue */
+    /* 找到最高优先级队列的对头，挑选该线程作为调度的 target */
     if (should_sched == 1) {
         for (level = 0; level < 3; ++level) {
             if (!is_empty(level)) {
@@ -275,6 +277,7 @@ uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high
             }
         }
     } else {
+        /* 如果不调度的话，就继续执行当前线程 */
         res = current_thread;
     }
 
