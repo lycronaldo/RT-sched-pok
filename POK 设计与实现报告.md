@@ -128,9 +128,9 @@ uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high,
 
 **实现**
 
-* 在`pok_thread_t`, `pok_thread_attr_t`这两个结构体中添加了`arrive_time`属性, 表示线程到达的绝对时间
-* 在线程初始化时, 也就是在`pok_partition_thread_create`中初始化此字段
-* 在每次时钟中断触发调度时, 都检查一次所有线程的arrive_time是否小于等于当前时间, 如果小于,则将其状态改为`POK_STATE_RUNNABLE`, 否则, 将其状态改为`POK_STATE_STOPPED`
+* 在`pok_thread_t`, `pok_thread_attr_t`这两个结构体中添加了`arrive_time`属性, 表示线程到达的绝对时间。
+* 在线程初始化时, 也就是在`pok_partition_thread_create`中初始化此字段。
+* 在每次时钟中断触发调度时, 都检查一次所有线程的arrive_time是否小于等于当前时间, 如果小于,则将其状态改为`POK_STATE_RUNNABLE`, 否则, 将其状态改为`POK_STATE_STOPPED`。
 
 ```c
 for (i = 0; i < new_partition->nthreads; i++) {
@@ -145,8 +145,47 @@ for (i = 0; i < new_partition->nthreads; i++) {
 }
 ```
 
-## 3. MLFQ算法简述
+## 3. 应用场景简述
 
+### 3.1 抢占式优先级调度场景
+
+**场景设置:**由于实时系统在 cyber physical system 中应用广泛，所以我们设计的应用场景就是现在非常流行的自动驾驶无人机。在这个简化的无人机系统中，一共有三个任务需要并发的运行，分别是：
+
+* 网络收发包线程：负责网络的收发包。这个线程的特点是，运行的周期十分频繁，但是任务执行的时间很短（utilization比较低）。
+* 飞行控制线程：负责障碍物的检测、飞行路线的计算任务。这个线程的特点是，运行的周期长，一次运行执行的时间也很长，而且该任务的关键性非常高，即出错的代价非常高。
+* 视频数据传输：负责将采集到的视频数据传回地面。这个线程的特点是时间敏感性不高，而且没有成功执行的代价也不高，所以可以在 cpu 空闲时占用cpu。
+
+结合以上三个线程的特点，我们可以分析出以下结论。飞行控制线程的关键性很高，但是一次执行的时间较长，这可能阻塞运行的网络收发包线程。所以我们需要让网络收发包拥有更高的优先级，让它能够抢占飞行控制线程获得 cpu 控制权，但是同时我们也要限制其 time capacity 保证飞行控制线程也能够顺利完成。而视频数据传输作为一个 best effort 线程，给予其 100% 的 cpu 利用率，但是限制它的优先级为最低，这样让它能够在另外两个线程不占用 cpu 时随意地使用 cpu。
+
+**线程属性：**
+
+|                    | time_capacity | period | priority |
+| :----------------- | ------------- | ------ | -------- |
+| **网络收发包线程** | 1             | 100    | 0        |
+| **飞行控制线程**   | 25            | 1000   | 1        |
+| **视频数据传输**   | 50            | 1000   | 2        |
+
+**注:**POK的 timer interrupt 已经修改过，现在是 1 ms 触发一次 timer interrupt（1 个 tick），`POK_TIMER_QUANTUM`（20）次 timer interrupt 后触发 `pok_sched`，会给 `thread->remaining_time_capacity` 减 1。也就是说 time_capacity 以20个 tick 为单位。同时 period 是以1个 tick 为单位的。
+
+### 3.2 抢占式EDF调度场景
+
+**场景设置:**带触控板的风扇控制器
+
+* GUI线程：负责与用户的交互。每 15 ms 运行一次，每次运行时间为 5 ms，deadline 为 10 ms。
+* 电机控制线程：负责根据用户的输入，实时的设置系统参数（比如转速、定时等）。每 20 ms 运行一次，每次运行时间为 8 ms，deadline 为 15 ms。
+* 电机驱动线程：负责驱动风扇的电机运转。每 30 ms 运行一次，每次运行时间为 10 ms，deadline 为 25 ms。
+
+**线程属性**：
+
+|                | Time_capacity | Period | Deadline | Priority |
+| -------------- | ------------- | ------ | -------- | -------- |
+| 网络收发包线程 | 5             | 15     | 10       | 42       |
+| 线程2          | 8             | 20     | 15       | 42       |
+| 电机控制线程   | 10            | 30     | 25       | 42       |
+
+**注:**时钟中断为1ms触发一次，每次时钟中断均会触发调度。若一个进程错过了其deadline，就将它kill掉。
+
+## 4. MLFQ算法简述
 **历史**
 
 * MLFQ算法是指 Multilevel Feedback Queue，即多级反馈队列。
@@ -159,7 +198,7 @@ for (i = 0; i < new_partition->nthreads; i++) {
 
 **算法细节**
 
-* it has multiple levels of queues, and uses feedback to determine the priority of a given job.
+* It has multiple levels of queues, and uses feedback to determine the priority of a given job.
 
 * History is its guide: pay attention to how jobs behave over time and treat them accordingly.
 
@@ -174,5 +213,107 @@ for (i = 0; i < new_partition->nthreads; i++) {
 
 **MLFQ算法特性**
 
-* instead of demanding a priori knowledge of the nature of a job, it observes the execution of a job and prioritizes it accordingly. In this way, it manages to achieve the best of both worlds: it can deliver excellent overall performance (similar to SJF/STCF) for short-running interactive jobs, and is fair and makes progress for long-running CPU-intensive workloads.
+* Instead of demanding a priori knowledge of the nature of a job, it observes the execution of a job and prioritizes it accordingly. In this way, it manages to achieve the best of both worlds: it can deliver excellent overall performance (similar to SJF/STCF) for short-running interactive jobs, and is fair and makes progress for long-running CPU-intensive workloads.
+
+## 5. MLFQ算法实现简述
+
+**环境设置：**
+
+* 设置`POK_CONFIG_NB_PARTITIONS`为1，我们只需要一个分区即可。
+* 修改内核时钟中断为每1ms触发一次，`POK_TIMER_QUANTUM`修改为1，即每个tick (1ms)都会出发一次调度。
+
+**实现：**
+
+* 我们在 POK 中实现了 MLFQ 调度算法。
+* 我们目前只设置了3级队列，在`sched.c`中使用一个静态全局变量来定义 `static queue mlfq[3];`
+
+* 队列相关接口（都是简单数据结构的实现，细节不再赘述）
+  * `uint32_t enqueue(uint32_t thread_index, uint32_t level)  `
+  * `uint32_t dequeue(uint32_t level)`
+  * `uint32_t head(int level)    //拿到第level级队列的队头`
+  * `int is_empty(int level)`
+* 每级队列具有不同的优先级，队列内部采用 round robin 的调度策略
+* 只有一个线程的 `remaing_time_capacity` 小于等于0或者当前时间片耗尽时才会选取新的线程进行执行。
+* 每级队列使用的时间片采用宏定义的方式来实现 `#define time_slice_in_level(x) ((x+1) * 2)` 
+* 对线程结构体添加了3个字段
+
+```c
+ 		/* mlfq */
+    uint32_t in_queue;         // 表示一个线程目前是否在队列当中
+    uint32_t level;		         // 表示一个线程目前处于第几级队列当中
+    uint64_t mlfq_time_slice;  // 表示当前进程剩余时间片
+```
+
+* 对 `pok_elect_thread` 的修改
+  * 除了将 `remaining_time_capacity` 减1之外，还把 `mlfq_time_slice` 减1。
+
+**代码详解：**
+
+```c
+uint32_t pok_sched_part_mlfq(const uint32_t index_low, const uint32_t index_high, uint32_t prev_thread,
+                           const uint32_t current_thread) {
+    uint64_t now = POK_GETTICK(); 
+    uint32_t index, level, should_sched;
+    int res;
+    pok_thread_t *ct;
+
+    should_sched = 0;
+    res = prev_thread;
+    res = -1;
+  
+    printf("mlfq sched start, current tick %d\n", now);
+
+    /* 遍历所有 thread ，如果有线程变成了 runnable 但是并不在任何队列当中，就把它插入到第一级队列当中*/
+    for (index = index_low; index <= index_high; ++index) {
+        ct = &pok_threads[index];
+        if (ct->state == POK_STATE_RUNNABLE && ct->in_queue == 0) {
+            enqueue(index, 0);
+            ct->level = 0;
+            ct->in_queue = 1;
+            ct->mlfq_time_slice = time_slice_in_level(0);
+        }
+    }
+
+    ct = &pok_threads[current_thread];
+    /* 如果当前线程是 IDLE_THEAD 或者为0,那么应该触发调度 */
+    if (current_thread == IDLE_THREAD || current_thread == 0) {
+        should_sched = 1;
+    } else if (ct->remaining_time_capacity <= 0 ) {
+        /* 如果当前线程已经耗尽 time_capacity， 就将其出队，且触发调度 */
+        printf("current thread %d time capacity <= 0\n", current_thread);
+        dequeue(ct->level);
+        ct->in_queue = 0;
+        should_sched = 1;
+    } else if (ct->mlfq_time_slice <= 0) {
+        /* 如果当前线程已经耗尽 time_slice，那么就将其插入下一级队列，且触发调度 */
+        printf("current thread: %d time slice <= 0\n", current_thread);
+        dequeue(ct->level);
+        enqueue(current_thread, min(ct->level + 1, 3));
+        ct->level = min(ct->level + 1, 3);
+        ct->mlfq_time_slice = time_slice_in_level(ct->level);
+        should_sched = 1;
+    }
+
+    /* 找到最高优先级队列的对头，挑选该线程作为调度的 target */
+    if (should_sched == 1) {
+        for (level = 0; level < 3; ++level) {
+            if (!is_empty(level)) {
+                res = head(level);
+                break;
+            }
+        }
+    } else {
+        /* 如果不调度的话，就继续执行当前线程 */
+        res = current_thread;
+    }
+
+    /* if there is no thread runnable */
+    if (res == -1)
+        res = IDLE_THREAD;
+
+    // print_thread_info(res);
+    printf("mlfq sched end, select %d\n", res);
+    return res;
+}
+```
 

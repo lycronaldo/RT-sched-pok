@@ -18,7 +18,7 @@
 #include <core/thread.h>
 void* pinger_job() {
     while (1) {
-        printf("P2T1: begin of task\n");
-        pok_thread_sleep(2000000);
+        printf("P2T1: I am dealing with network packet.\n");
+        pok_thread_sleep(200);
     }
 }

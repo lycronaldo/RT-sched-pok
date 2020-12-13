@@ -20,6 +20,11 @@
  **\\author Julien Delange
  */
 
+// #define POK_NEEDS_SCHED 1
+// #define POK_NEEDS_PARTITIONS 1
+// #define POK_CONFIG_NB_PARTITIONS 2
+// #define POK_CONFIG_SCHEDULING_NBSLOTS 2
+
 #if defined(POK_NEEDS_SCHED) || defined(POK_NEEDS_THREADS)
 
 #include <types.h>
@@ -449,6 +454,39 @@ uint32_t pok_sched_part_rr(const uint32_t index_low, const uint32_t index_high, 
     if ((res == from) && (pok_threads[res].state != POK_STATE_RUNNABLE)) {
         res = IDLE_THREAD;
     }
+    return res;
+}
+
+uint32_t pok_sched_preemptive_priority(const uint32_t index_low, const uint32_t index_high, const uint32_t prev_thread, const uint32_t current_thread) {
+    int res = -1;
+    uint32_t tmp, from;
+    uint16_t highest_priority = 0x100;
+
+    printf("index_low:%d, index_high:%d\n", index_low, index_high);
+    if (current_thread == IDLE_THREAD) {
+        res = prev_thread;
+    } else {
+        res = current_thread;
+    }
+
+    from = res;
+    tmp = res;
+
+    do {
+        tmp++;
+        if (tmp > index_high) {
+            tmp = index_low;
+        }
+        if (pok_threads[tmp].state == POK_STATE_RUNNABLE && pok_threads[tmp].priority < highest_priority) {
+            res = tmp;
+            highest_priority = pok_threads[tmp].priority;
+        }
+    } while (tmp != from);
+
+    if (res == -1) {
+        res = IDLE_THREAD;
+    }
+
     return res;
 }
 
