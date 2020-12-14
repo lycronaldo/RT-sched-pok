@@ -119,6 +119,32 @@ uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high,
 }
 ```
 
+### 1.4 Weighted-Round-Robin调度
+
+**环境配置**
+
+* 只需要一个分区，可设定partition数为1，即POK_CONFIG_NB_PARTITIONS = 1。
+* timer设置为每1ms触发一次，time slice设为1ms（即每一次中断都触发调度）。
+
+**实现**
+
+* 增加POK_SCHED_WEIGHTED_RR的enum（schedvalues.h）。
+
+* 在thread attribute中增加weight用于初始化权重，在thread中增加weight和origin weight，
+
+  用于调度时判断权重和重新分配权重。
+
+* 当所有线程执行完毕后，会安排一次权重的重新分配（即重新初始化权重）
+* 算法的基本思想：在每一次调度的时候，都找出当前weight的最大公约数并且进行执行：
+
+```c
+
+```
+
+
+
+
+
 ## 2. 动态线程调度
 
 **环境设置**
@@ -198,12 +224,11 @@ for (i = 0; i < new_partition->nthreads; i++) {
 
 |               | Time capacity | Period | Weight |
 | ------------- | ------------- | ------ | ------ |
-| 鼠标移动线程    |       10      |   100  |   4   |
-| 数据更新线程    |       15      |   100  |   3   |
-| 界面渲染线程    |       20      |   100  |   2   |
+| 鼠标移动线程    |       10      |   100  |   15   |
+| 数据更新线程    |       15      |   100  |   13   |
+| 界面渲染线程    |       20      |   100  |   10   |
 
-**注:**每1ms一次时钟中断并触发调度，每一次进入内核被调度到的线程的weight都会减1。当所有线程的weight都减到0之后，
-weight会重置为原来的值。目前暂时不考虑非常快速移动界面导致界面渲染线程还未完成，就需要更新鼠标线程的场景。
+**注:**每1ms一次时钟中断并触发调度，每一次进入内核被调度到的线程的weight都会减1。当所有线程的weight都减到0之后，如果线程还没有完成，则会按照原来weight的大小顺序依次执行（非round-robin，为了适应当前场景），直到所有time capacity耗光（代表线程工作执行完毕）。目前暂时不考虑非常快速移动界面导致界面渲染线程还未完成，就需要更新鼠标线程的场景。
 
 ## 4. MLFQ算法简述
 **历史**
