@@ -138,7 +138,117 @@ uint32_t pok_sched_part_edf(const uint32_t index_low, const uint32_t index_high,
 * 算法的基本思想：在每一次调度的时候，都找出当前weight的最大公约数并且进行执行：
 
 ```c
+/**
+ * These are functions of weighted round robin, including compute greatest common divisor,
+ * calculate max weight and recharge the weight of each thread.
+ */
 
+/* Compute the Greatest Common Devisor */
+static int gcd(int a, int b) {
+    if (a == b || a == 0 || b == 0)
+        return (a == 0) ? a : b;
+    int divide = (a > b) ? a : b;
+    int divider = (a < b) ? a : b;
+    int res = divide / divider;
+    int tail = divide % divider;
+    while(tail) {
+        divide = divider;
+        divider = tail;
+        res = divide / divider;
+        tail = divide % divider;
+    }
+    res++; // avoid unused warning
+    return divider;
+}
+
+/* Compute greatest common divisor of all threads weight */
+static int gcd_weight(const uint32_t index_low, const uint32_t index_high) {
+    int res = 0;
+    uint32_t i1, i2;
+    i1 = index_low;
+    while (1) {
+        if (!res)
+            res = pok_threads[i1].weight;
+        i2 = i1 + 1;
+        if (i2 > index_high)
+            break;
+        res = gcd(res, pok_threads[i2].weight);
+        i1 = i2;
+    }
+    return res;
+}
+
+/* Compute the max weight of all threads */
+static int max_weight(const uint32_t index_low, const uint32_t index_high) {
+    int max_weight, current_weight;
+    max_weight = 0;
+    uint32_t i;
+    for (i = index_low; i <= index_high; ++i) {
+        current_weight = pok_threads[i].weight;
+        if (max_weight < current_weight)
+            max_weight = current_weight;
+    }
+    return max_weight;
+}
+
+/* Recharge weight of all threads */
+static void recharge_weight(const uint32_t index_low, const uint32_t index_high) {
+    uint32_t i;
+    for (i = index_low; i <= index_high; ++i)
+        if (pok_threads[i].state == POK_STATE_RUNNABLE)
+            pok_threads[i].weight = pok_threads[i].origin_weight;
+}
+
+/* Main schedule function */
+uint32_t pok_sched_part_weighted_rr(const uint32_t index_low, const uint32_t index_high, 
+                                    const uint32_t __attribute__((unused)) prev_thread, 
+                                    const uint32_t __attribute__((unused)) current_thread) {
+    uint32_t res;
+    uint32_t from = (current_thread == IDLE_THREAD) ? prev_thread : current_thread;
+    uint32_t i = ((from + 1) >= index_high) ? (index_low + 1) : (from + 1);
+    res = index_low;
+    static int current_weight = 0;
+
+    while (1) {
+        if (i == index_low + 1) {
+            int gcd = gcd_weight(index_low + 1, index_high - 1);
+            current_weight -= gcd;
+            if (current_weight <= 0) {
+                current_weight = max_weight(index_low + 1, index_high - 1);
+                if (current_weight == 0)
+                    break;
+            }
+        }
+        if (pok_threads[i].state == POK_STATE_RUNNABLE) {
+            if (pok_threads[i].weight >= current_weight && pok_threads[i].remaining_time_capacity > 0) {
+                res = i;
+                break;
+            }
+        }
+
+        i = (i + 1 >= index_high) ? index_low + 1 : (i + 1);
+    }
+
+    if (res == index_low) {
+        do {
+            ++res;
+            if (res >= index_high) {
+                res = IDLE_THREAD;
+                break;
+            }
+        } while (pok_threads[res].remaining_time_capacity <= 0);
+        if (res == IDLE_THREAD) {
+            recharge_weight(index_low + 1, index_high - 1);
+            // it means in this period, all thread execution done
+            printf("######\nAll threads clear\n########\n");
+        }
+        printf("[Pok weighted round robin] sched thread: %d\n", res);
+    } else {
+        pok_threads[res].weight--;
+        printf("[Pok weighted round robin] sched thread: %d\n", res);
+    }
+    return res;
+}
 ```
 
 
