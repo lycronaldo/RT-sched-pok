@@ -322,10 +322,10 @@ void pok_sched() {
             pok_partitions[pok_current_partition].prev_thread = pok_partitions[pok_current_partition].current_thread;
         }
         pok_partitions[pok_current_partition].current_thread = elected_thread;
-        printf("Thread %d of partition %d scheduled at %d\n",
-               elected_thread - pok_partitions[pok_current_partition].thread_index_low,
-               pok_current_partition,
-               POK_GETTICK());
+        // printf("Thread %d of partition %d scheduled at %d\n",
+        //        elected_thread - pok_partitions[pok_current_partition].thread_index_low,
+        //        pok_current_partition,
+        //        POK_GETTICK());
     }
     pok_sched_context_switch(elected_thread);
 }
@@ -512,15 +512,11 @@ static int gcd_weight(const uint32_t index_low, const uint32_t index_high) {
     uint32_t i1, i2;
     i1 = index_low;
     while (1) {
-        while (pok_threads[i1].state != POK_STATE_RUNNABLE)
-            ++i1;
         if (!res)
             res = pok_threads[i1].weight;
         i2 = i1 + 1;
         if (i2 > index_high)
             break;
-        while (pok_threads[i2].state != POK_STATE_RUNNABLE)
-            ++i2;
         res = gcd(res, pok_threads[i2].weight);
         i1 = i2;
     }
@@ -532,8 +528,6 @@ static int max_weight(const uint32_t index_low, const uint32_t index_high) {
     max_weight = 0;
     uint32_t i;
     for (i = index_low; i <= index_high; ++i) {
-        if (pok_threads[i].state != POK_STATE_RUNNABLE)
-            continue;
         current_weight = pok_threads[i].weight;
         if (max_weight < current_weight)
             max_weight = current_weight;
@@ -541,39 +535,33 @@ static int max_weight(const uint32_t index_low, const uint32_t index_high) {
     return max_weight;
 }
 
-static void recharge_timeslice(const uint32_t index_low, const uint32_t index_high) {
-    uint32_t i;
-    for (i = index_low; i <= index_high; ++i)
-        if (pok_threads[i].state == POK_STATE_RUNNABLE)
-            pok_threads[i].weight = pok_threads[i].origin_weight;
-}
+// static void recharge_weight(const uint32_t index_low, const uint32_t index_high) {
+//     uint32_t i;
+//     for (i = index_low; i <= index_high; ++i)
+//         if (pok_threads[i].state == POK_STATE_RUNNABLE)
+//             pok_threads[i].weight = pok_threads[i].origin_weight;
+// }
 
 uint32_t pok_sched_part_weighted_rr(const uint32_t index_low, const uint32_t index_high, 
                                     const uint32_t __attribute__((unused)) prev_thread, 
                                     const uint32_t __attribute__((unused)) current_thread) {
     uint32_t res;
     uint32_t i = index_low + 1;
-    res = i;
+    res = index_low;
     int current_weight = 0;
 
-    // if ((pok_threads[current_thread].remaining_time_capacity > 0)
-    //     && (pok_threads[current_thread].state == POK_STATE_RUNNABLE)) {
-    //     return current_thread;
-    // }
-
     while (i < index_high) {
-        if (pok_threads[i].state == POK_STATE_RUNNABLE) {
-            if (i == index_low + 1) {
-                int gcd = gcd_weight(index_low + 1, index_high - 1);
-                printf("gcd weight: %d\n", gcd);
-                current_weight -= gcd;
-                if (current_weight <= 0) {
-                    current_weight = max_weight(index_low + 1, index_high - 1);
-                    if (current_weight == 0)
-                        break;
-                }
+        if (i == index_low + 1) {
+            int gcd = gcd_weight(index_low + 1, index_high - 1);
+            current_weight -= gcd;
+            if (current_weight <= 0) {
+                current_weight = max_weight(index_low + 1, index_high - 1);
+                if (current_weight == 0)
+                    break;
             }
-            if (pok_threads[i].weight >= current_weight) {
+        }
+        if (pok_threads[i].state == POK_STATE_RUNNABLE) {
+            if (pok_threads[i].weight >= current_weight && pok_threads[i].remaining_time_capacity > 0) {
                 res = i;
                 break;
             }
@@ -582,12 +570,22 @@ uint32_t pok_sched_part_weighted_rr(const uint32_t index_low, const uint32_t ind
         i += 1;
     }
 
-    if (res != i) {
-        recharge_timeslice(index_low + 1, index_high - 1);
-        res = IDLE_THREAD;
+    if (res == index_low) {
+        do {
+            ++res;
+            if (res >= index_high) {
+                res = IDLE_THREAD;
+                break;
+            }
+        } while (pok_threads[res].remaining_time_capacity <= 0);
+        if (res == IDLE_THREAD) {
+            // recharge_weight(index_low + 1, index_high - 1);
+            printf("######\nAll threads clear\n########\n");
+        }
+        printf("[Pok weighted round robin] sched thread: %d\n", res);
     } else {
         pok_threads[res].weight--;
-        printf("[sched result] sched out thread: %d, sched in thread: %d\n", current_thread, res);
+        printf("[Pok weighted round robin] sched thread: %d\n", res);
     }
     return res;
 }

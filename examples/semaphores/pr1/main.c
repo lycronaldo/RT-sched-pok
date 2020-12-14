@@ -32,22 +32,22 @@ int main() {
     // printf("[P1] pok_sem_create return=%d, mid=%d\n", ret, sid);
 
     tattr.time_capacity = 10;
-    tattr.period = 100;
-    tattr.weight = 4;
+    tattr.period = 1000;
+    tattr.weight = 15;
     tattr.entry = receive_signal;
     ret = pok_thread_create(&tid, &tattr);
     printf("[P1] pok_thread_create (1) return=%d\n", ret);
 
-    tattr.time_capacity = 10;
+    tattr.time_capacity = 15;
     tattr.period = 1000;
-    tattr.weight = 3;
+    tattr.weight = 13;
     tattr.entry = flying_control;
     ret = pok_thread_create(&tid, &tattr);
     printf("[P1] pok_thread_create (2) return=%d\n", ret);
 
-    tattr.time_capacity = 10;
+    tattr.time_capacity = 20;
     tattr.period = 1000;
-    tattr.weight = 2;
+    tattr.weight = 10;
     tattr.entry = transfer_video_stream;
     ret = pok_thread_create(&tid, &tattr);
     printf("[P1] pok_thread_create (3) return=%d\n", ret);\
