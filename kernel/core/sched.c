@@ -490,6 +490,12 @@ uint32_t pok_sched_preemptive_priority(const uint32_t index_low, const uint32_t 
     return res;
 }
 
+/**
+ * These are functions of weighted round robin, including compute greatest common divisor,
+ * calculate max weight and recharge the weight of each thread.
+ */
+
+/* Compute the Greatest Common Devisor */
 static int gcd(int a, int b) {
     if (a == b || a == 0 || b == 0)
         return (a == 0) ? a : b;
@@ -507,6 +513,7 @@ static int gcd(int a, int b) {
     return divider;
 }
 
+/* Compute greatest common divisor of all threads weight */
 static int gcd_weight(const uint32_t index_low, const uint32_t index_high) {
     int res = 0;
     uint32_t i1, i2;
@@ -523,6 +530,7 @@ static int gcd_weight(const uint32_t index_low, const uint32_t index_high) {
     return res;
 }
 
+/* Compute the max weight of all threads */
 static int max_weight(const uint32_t index_low, const uint32_t index_high) {
     int max_weight, current_weight;
     max_weight = 0;
@@ -535,6 +543,7 @@ static int max_weight(const uint32_t index_low, const uint32_t index_high) {
     return max_weight;
 }
 
+/* Recharge weight of all threads */
 static void recharge_weight(const uint32_t index_low, const uint32_t index_high) {
     uint32_t i;
     for (i = index_low; i <= index_high; ++i)
@@ -542,6 +551,7 @@ static void recharge_weight(const uint32_t index_low, const uint32_t index_high)
             pok_threads[i].weight = pok_threads[i].origin_weight;
 }
 
+/* Main schedule function */
 uint32_t pok_sched_part_weighted_rr(const uint32_t index_low, const uint32_t index_high, 
                                     const uint32_t __attribute__((unused)) prev_thread, 
                                     const uint32_t __attribute__((unused)) current_thread) {
