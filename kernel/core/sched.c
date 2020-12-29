@@ -462,7 +462,6 @@ uint32_t pok_sched_preemptive_priority(const uint32_t index_low, const uint32_t 
     uint32_t tmp, from;
     uint16_t highest_priority = 0x100;
 
-    printf("index_low:%d, index_high:%d\n", index_low, index_high);
     if (current_thread == IDLE_THREAD) {
         res = prev_thread;
     } else {
